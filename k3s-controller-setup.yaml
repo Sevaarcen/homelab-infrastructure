@@ -1,0 +1,37 @@
+- become: yes
+  hosts: all
+  gather_facts: no
+  name: k3s-controller-setup
+  tasks:
+    - name: Wait for SSH to be fully online
+      wait_for_connection:
+    - name: Download K3S Installer
+      get_url:
+        url: https://get.k3s.io
+        dest: /tmp/k3s-install.sh
+    - name: Install K3S as Server
+      shell: sh /tmp/k3s-install.sh server --write-kubeconfig-mode 664 --node-taint CriticalAddonsOnly=true:NoExecute --datastore-endpoint="{{ datastore_endpoint }}"
+    - name: Wait for node-token file to exist
+      wait_for:
+        path: /var/lib/rancher/k3s/server/token
+        delay: 0
+        timeout: 60
+        state: present
+        msg: "Node-token file still doesn't exist"
+    - name: Grab node-token file to local
+      slurp:
+        path: /var/lib/rancher/k3s/server/token
+    - name: FirewallD Config for K3S
+      firewalld:
+        permanent: yes
+        immediate: yes
+        port: "6443/tcp"
+        state: enabled
+    
+
+
+# curl -sfL https://get.k3s.io | sh -s - server --node-taint --datastore-endpoint="VARNAME HERE"
+# sudo cat /var/lib/rancher/l3s/server/node-token
+
+
+# curl -sfL https://get.k3s.io | K3S_URL=https://LOADBAL:443 K3S_TOKEN=NODE_TOKEN_VAR_FROM_ABOVE sh -

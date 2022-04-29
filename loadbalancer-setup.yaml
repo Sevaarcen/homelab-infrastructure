@@ -1,0 +1,16 @@
+- become: yes
+  hosts: 'all'
+  gather_facts: no
+  name: k3s-loadbalancer-setup
+  tasks:
+    - name: Wait for SSH to be fully online
+      wait_for_connection:
+    - name: Wait for apt to unlock
+      become: yes
+      shell:  while fuser /var/lib/dpkg/lock >/dev/null 2>&1; do sleep 5; done;
+    - name: Install nginx
+      dnf:
+        name: nginx
+        update_cache: yes
+        state: latest
+    # insntall config file based on controller IPs dynamically somehow, as arg?

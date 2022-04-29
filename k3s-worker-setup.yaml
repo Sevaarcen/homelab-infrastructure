@@ -1,0 +1,16 @@
+- become: yes
+  hosts: all
+  gather_facts: no
+  name: k3s-worker-setup
+  tasks:
+    - name: Wait for SSH to be fully online
+      wait_for_connection:
+    - name: Download K3S Installer
+      get_url:
+        url: https://get.k3s.io
+        dest: /tmp/k3s-install.sh
+    - name: Generate random ID
+      shell: tr -dc A-Za-z0-9 </dev/urandom | head -c 8
+      register: random_id
+    - name: Install K3S as Agent
+      shell: sh /tmp/k3s-install.sh agent --token={{ node_token }} --server "{{ k3s_url }}" --with-node-id {{ random_id.stdout }}
