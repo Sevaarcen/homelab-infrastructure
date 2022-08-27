@@ -56,7 +56,7 @@ resource "null_resource" "k3s_controller_deployment" {
 }
 
 data "external" "k3s_controller_provision_ansible" {
-    program = ["bash", "./k3s-controller-provision-ansible.sh"]
+    program = ["bash", "./ansible-run-scripts/k3s-controller-provision-ansible.sh"]
 
     query = {
         hosts = "${join(",", [for vm in proxmox_vm_qemu.k3os-controller: vm.default_ipv4_address])},"

@@ -11,6 +11,15 @@
         dest: /tmp/k3s-install.sh
     - name: Install K3S as Server
       shell: sh /tmp/k3s-install.sh server --write-kubeconfig-mode 664 --node-taint CriticalAddonsOnly=true:NoExecute --datastore-endpoint="{{ datastore_endpoint }}"
+      ignore_errors: yes
+    - name: Wait for K3S service to start
+      service:
+        name: k3s
+        state: started
+      register: k3sservicedetails
+      until: k3sservicedetails.status.ActiveState == "active"
+      retries: 10
+      delay: 5
     - name: Wait for node-token file to exist
       wait_for:
         path: /var/lib/rancher/k3s/server/token
@@ -21,12 +30,24 @@
     - name: Grab node-token file to local
       slurp:
         path: /var/lib/rancher/k3s/server/token
-    - name: FirewallD Config for K3S
+    - name: Configure FirewallD rules to allow required ports for Kubernetes control plane  # https://rancher.com/docs/rancher/v2.5/en/installation/resources/advanced/firewall/
       firewalld:
         permanent: yes
         immediate: yes
-        port: "6443/tcp"
+        port: " {{ item }}"
         state: enabled
+      loop:
+        - "22/tcp"
+        - "80/tcp"
+        - "443/tcp"
+        - "2376/tcp"
+        - "6443/tcp"
+        - "8472/udp"
+        - "9099/tcp"
+        - "10250/tcp"
+        - "10254/tcp"
+        - "30000-32767/tcp"
+        - "30000-32767/udp"
     
 
 

@@ -15,7 +15,7 @@ provider "proxmox" {
 
     # for debugging / development
     pm_log_enable = true
-    pm_log_file   = "terraform-plugin-proxmox.log"
+    pm_log_file   = "./logs/terraform-plugin-proxmox.log"
     pm_debug      = true
     pm_log_levels = {
         _default    = "debug"
@@ -38,7 +38,7 @@ resource "null_resource" "remove_prexisting_cluster_token" {
 #  Post-deployment tasks
 #
 data "external" "get-joined-node-info" {
-    program = ["bash", "./k3s-deployment-finalize.sh"]
+    program = ["bash", "./ansible-run-scripts/k3s-deployment-finalize.sh"]
 
     query = {
         hosts = "${join(",", [for vm in proxmox_vm_qemu.k3os-controller: vm.default_ipv4_address])},"
@@ -49,5 +49,31 @@ data "external" "get-joined-node-info" {
         # This is not used, but ensures that the read will be deferred until
         # after the deployment is done.
         deployment = data.external.k3s_worker_provision_ansible.result["plays.0.play.name"]
+    }
+}
+
+# Then restart each VM to make sure that Traefik is actually instantiated properly, as it errors out otherwise on OL8...
+resource "null_resource" "restart_controllers_and_workers" {
+    for_each = merge({
+                    for vm in proxmox_vm_qemu.k3os-controller:
+                        vm.name => vm.default_ipv4_address       
+                }, {
+                    for vm in proxmox_vm_qemu.k3os-worker:
+                        vm.name => vm.default_ipv4_address   
+                })
+
+    provisioner "remote-exec" {
+        inline = [
+            "sudo shutdown -r now"
+        ]
+
+        on_failure = continue  # remote-exec will exit early b/c of disconnect, but that's expected and should be ignored.
+
+        connection {
+            host = each.value
+            type = "ssh"
+            user = var.ci_user
+            private_key = file(var.ssh_private_key)
+        }
     }
 }

@@ -1,5 +1,5 @@
 - become: yes
-  hosts: all[0]
+  hosts: all[0] # Only deploy on the first host since these tasks will effect the entire cluster
   gather_facts: no
   name: final-setup-tasks
   tasks:
@@ -12,7 +12,7 @@
       rescue:
         - name: Kubernetes Dashboard - Create deployment file
           copy:
-            dest: /tmp/kubernetes-dashboard-deployment.yaml
+            dest: /tmp/dashboard.deployment.yaml
             content: |
               # Copyright 2017 The Kubernetes Authors.
               #
@@ -53,11 +53,10 @@
                 name: kubernetes-dashboard
                 namespace: kubernetes-dashboard
               spec:
-                type: NodePort
+                type: ClusterIP
                 ports:
                   - port: 443
                     targetPort: 8443
-                    nodePort: 30443
                 selector:
                   k8s-app: kubernetes-dashboard
 
@@ -319,20 +318,19 @@
                       - name: tmp-volume
                         emptyDir: {}
         - name: Install Kubernetes Dashboard
-          shell: /usr/local/bin/kubectl apply -f /tmp/kubernetes-dashboard-deployment.yaml
-        - name: Kubernetes Dashboard - Create admin user config file
+          shell: /usr/local/bin/kubectl apply -f /tmp/dashboard.deployment.yaml
+        - name: Kubernetes Dashboard - Create service account for admin user, and manually create token (as required in Kubernetes >= 1.24)
           copy:
-            dest: /tmp/dashboard.admin-user.yaml
+            dest: /tmp/dashboard.admin-user-config.yaml
             content: |
               apiVersion: v1
               kind: ServiceAccount
               metadata:
                 name: admin-user
                 namespace: kubernetes-dashboard
-        - name: Kubernetes Dashboard - Create admin user role config file
-          copy:
-            dest: /tmp/dashboard.admin-user-role.yaml
-            content: |
+
+              ---
+
               apiVersion: rbac.authorization.k8s.io/v1
               kind: ClusterRoleBinding
               metadata:
@@ -345,7 +343,18 @@
               - kind: ServiceAccount
                 name: admin-user
                 namespace: kubernetes-dashboard
-        - name: Kubernetes Dashboard - Deploy admin user configuration
-          shell: /usr/local/bin/kubectl create -f /tmp/dashboard.admin-user.yaml -f /tmp/dashboard.admin-user-role.yaml
+
+              ---
+
+              apiVersion: v1
+              kind: Secret
+              type: kubernetes.io/service-account-token
+              metadata:
+                name: admin-user-token
+                namespace: kubernetes-dashboard
+                annotations:
+                  kubernetes.io/service-account.name: admin-user
+        - name: Kubernetes Dashboard - Deploy admin service account w/ full configuration
+          shell: /usr/local/bin/kubectl create -f /tmp/dashboard.admin-user-config.yaml
     - name: Get admin user token for Kubernetes Dashboard
       shell: /usr/local/bin/kubectl -n kubernetes-dashboard describe secret admin-user-token | grep '^token' | awk '{print $2}'

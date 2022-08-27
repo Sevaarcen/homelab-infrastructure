@@ -1,6 +1,6 @@
 resource "proxmox_vm_qemu" "k3os-worker" {
     count = length(var.worker_nodes)
-    name = format("k3os-worker-%02d", count.index+1)
+    name = format("k3s-worker-%02d", count.index+1)
 
     target_node = var.worker_nodes[count.index]
 
@@ -53,7 +53,7 @@ resource "proxmox_vm_qemu" "k3os-worker" {
 }
 
 data "external" "k3s_worker_provision_ansible" {
-    program = ["bash", "./k3s-worker-provision-ansible.sh"]
+    program = ["bash", "./ansible-run-scripts/k3s-worker-provision-ansible.sh"]
 
     query = {
         hosts = "${join(",", [for vm in proxmox_vm_qemu.k3os-worker: vm.default_ipv4_address])},"
@@ -61,6 +61,6 @@ data "external" "k3s_worker_provision_ansible" {
         public_key = var.ssh_public_key
         k3s_loadbalancer_url = var.k3s_loadbalancer_url
         ansible_user = var.ci_user
-        node_token = trimspace(base64decode(data.external.k3s_controller_provision_ansible.result["plays.0.tasks.4.hosts.192.168.1.31.content"]))
+        node_token = trimspace(base64decode(data.external.k3s_controller_provision_ansible.result["plays.0.tasks.5.hosts.192.168.1.31.content"]))
     }
 }

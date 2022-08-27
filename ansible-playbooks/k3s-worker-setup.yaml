@@ -14,3 +14,21 @@
       register: random_id
     - name: Install K3S as Agent
       shell: sh /tmp/k3s-install.sh agent --token={{ node_token }} --server "{{ k3s_url }}" --with-node-id {{ random_id.stdout }}
+    - name: Configure FirewallD rules to allow required ports for Kubernetes worker  # https://rancher.com/docs/rancher/v2.5/en/installation/resources/advanced/firewall/
+      firewalld:
+        permanent: yes
+        immediate: yes
+        port: " {{ item }}"
+        state: enabled
+      loop:
+        - "22/tcp"
+        - "80/tcp"
+        - "443/tcp"
+        - "2376/tcp"
+        - "8472/udp"
+        - "9099/tcp"
+        - "10250/tcp"
+        - "10254/tcp"
+        - "30000-32767/tcp"
+        - "30000-32767/udp"
+

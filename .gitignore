@@ -34,4 +34,4 @@ override.tf.json
 terraform.rc
 
 # Ignore log files generated from deployments
-*.log
+logs/*
